@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { AUDIENCES, ALL_AWARDS, findAward } from '../src/lib/cert/awards.js';
 import { PAPERS, pixelSize, fitSize, wrapLines, formatDate, slug, fileName, seeded, pickRandom, assignAwards, parseBatch, resolveBatch } from '../src/lib/cert/core.js';
 import { buildPdf } from '../src/lib/cert/pdf.js';
-import { drawCertificate, describe, DESIGNS, COLORS } from '../src/lib/cert/draw.js';
+import { drawCertificate, describe, curly, DESIGNS, COLORS } from '../src/lib/cert/draw.js';
 
 let passed = 0;
 const t = (name, fn) => {
@@ -57,6 +57,18 @@ t('PDF: three A4 pages, offsets right after binary data', () => {
   // The JPEG bytes sit unchanged between "stream\n" and "\nendstream".
   const i = s.indexOf('/Length 1234 >>\nstream\n') + '/Length 1234 >>\nstream\n'.length;
   assert.equal(s.slice(i + 1234, i + 1234 + 10), '\nendstream');
+});
+t('PDF: shared background, one band per page placed in points from the bottom', () => {
+  const background = { jpeg: fakeJpeg(900), w: 2200, h: 1700 };
+  const pages = [{ jpeg: fakeJpeg(300), w: 1600, h: 560, x: 304, y: 640 }, { jpeg: fakeJpeg(310), w: 1536, h: 512, x: 336, y: 656 }];
+  const s = latin1(buildPdf(pages, PAPERS.letter, 'Award certificate', { background }));
+  assert.equal(checkXref(s), 11);
+  assert.match(s, /\/Count 2 /);
+  // The background image is stored once and both pages point at it.
+  assert.equal((s.match(/\/Width 2200 \/Height 1700 /g) || []).length, 1);
+  assert.equal((s.match(/\/Bg 4 0 R/g) || []).length, 2);
+  // 1600 x 560 px at 0.36 pt per px = 576 x 201.6 pt; x = 304 px = 109.44 pt; y = 612 - (640 + 560) * 0.36 = 180 pt.
+  assert.match(s, /q 792 0 0 612 0 0 cm \/Bg Do Q q 576 0 0 201\.6 109\.44 180 cm \/Im0 Do Q/);
 });
 
 // ---------- text fitting ----------
@@ -204,6 +216,11 @@ t('pools: lengths, punctuation and kindness', () => {
     assert.ok(!BLOCK.test(a.title) && !BLOCK.test(a.reason), `blocked word in: ${a.title} / ${a.reason}`);
   }
 });
+t('pools: no award a child or coworker could read as a dig', () => {
+  // Earlier drafts had these; each reads as "you sat out", "you are always late" or "your meetings are pointless".
+  const DIG = /\b(sideline|bench\w*|water bottle|could have been an email|nap|test day|mostly|most of the time)\b/i;
+  for (const a of ALL_AWARDS) assert.ok(!DIG.test(a.title + ' ' + a.reason), `reads as a dig: ${a.title} / ${a.reason}`);
+});
 t('pools: findAward', () => {
   assert.equal(findAward('  best hugger award ').title, 'Best Hugger Award');
   assert.equal(findAward('Nope'), null);
@@ -251,6 +268,24 @@ t('draw: very long text is still drawn whole', () => {
   const long = 'W'.repeat(60);
   drawCertificate(ctx, 1100, 850, { name: long, award: 'Award '.repeat(12).trim(), reason: 'reason '.repeat(20).trim() }, { design: 'modern' });
   assert.ok(ctx.texts.includes(long));
+});
+t('curly quotes on the certificate', () => {
+  assert.equal(curly(' Most Likely to Say "Are We There Yet?" Award '), 'Most Likely to Say \u201cAre We There Yet?\u201d Award');
+  assert.equal(curly("Zoë O'Brien"), 'Zo\u00eb O\u2019Brien');
+  assert.equal(curly("'Ace' Lee"), '\u2018Ace\u2019 Lee');
+  assert.equal(curly(null), '');
+});
+t('batch: "Last, First" school export is flagged, and namesOnly reads it as one name', () => {
+  const text = 'Brooks, Ava\nChen, Liam\nHaddad, Noor';
+  assert.equal(parseBatch(text).nameColumns, true);
+  const r = parseBatch(text, 300, { namesOnly: true });
+  assert.deepEqual(r.rows.map((x) => [x.name, x.award]), [['Ava Brooks', ''], ['Liam Chen', ''], ['Noor Haddad', '']]);
+  assert.deepEqual(parseBatch('First\tLast\nAva\tBrooks\nLiam\tChen', 300, { namesOnly: true }).rows.map((x) => x.name), ['First Last', 'Ava Brooks', 'Liam Chen']);
+  assert.deepEqual(parseBatch('Last name, First name\nBrooks, Ava', 300, { namesOnly: true }).rows.map((x) => x.name), ['Ava Brooks']);
+});
+t('batch: real awards are not flagged as name columns', () => {
+  assert.equal(parseBatch('Ava, Super Helper Award\nLiam, Bookworm Award\nNoor, Kindness Queen').nameColumns, false);
+  assert.equal(parseBatch('Ava\nLiam, Brooks').nameColumns, false);
 });
 t('describe', () => assert.equal(describe({ name: 'Ava', award: 'Best Hugger Award', date: 'May 1, 2026', sig2: ' ' }), 'Ava. Best Hugger Award. Date: May 1, 2026'));
 

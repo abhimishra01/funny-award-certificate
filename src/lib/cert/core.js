@@ -146,18 +146,27 @@ function splitCsv(line) {
 
 /**
  * Parse the batch list. One person per line: "Name", "Name, Award" or "Name<TAB>Award".
- * Returns { rows: [{ name, award, reason }], ignored } where award is '' when the line has none
+ * Returns { rows: [{ name, award, reason }], ignored, nameColumns } where award is '' when the line has none
  * and reason is the pool reason when the award matches a pool title (else '').
+ * nameColumns is true when the second column looks like last or first names ("Brooks, Ava" from a
+ * school export, or two name columns from a spreadsheet), so the page can offer the namesOnly fix.
+ * namesOnly = true reads every line as one name: "Brooks, Ava" -> "Ava Brooks", "Ava<TAB>Brooks" -> "Ava Brooks".
  */
-export function parseBatch(text, max = MAX_BATCH) {
+export function parseBatch(text, max = MAX_BATCH, { namesOnly = false } = {}) {
   const rows = [];
   let ignored = 0;
   const lines = String(text || '').split(/\r\n|\r|\n/);
   let first = true;
+  let withAward = 0;
+  let nameLike = 0;
   for (const raw of lines) {
     if (!raw.trim()) continue;
     let name, award;
-    if (raw.includes('\t')) {
+    if (namesOnly) {
+      const parts = (raw.includes('\t') ? raw.split('\t') : splitCsv(raw)).map((x) => x.trim()).filter(Boolean);
+      name = raw.includes('\t') || parts.length !== 2 ? parts.join(' ') : `${parts[1]} ${parts[0]}`;
+      award = '';
+    } else if (raw.includes('\t')) {
       const parts = raw.split('\t');
       name = parts[0];
       award = parts.slice(1).filter((s) => s.trim()).join(' ');
@@ -171,13 +180,18 @@ export function parseBatch(text, max = MAX_BATCH) {
     if (first) {
       first = false;
       if (/^(names?|recipients?|students?|players?)$/i.test(name) && (!award || /^(awards?|titles?)$/i.test(award))) continue;
+      if (namesOnly && /^\s*"?((last|first|full|student|player)\s*)?names?"?\s*([,\t]|$)/i.test(raw)) continue;
     }
     if (!name && !award) continue;
     if (rows.length >= max) { ignored++; continue; }
     const hit = findAward(award);
+    if (award) {
+      withAward++;
+      if (!hit && !/\s/.test(award) && !/award/i.test(award) && /^[\p{L}'’.-]+$/u.test(award)) nameLike++;
+    }
     rows.push({ name: name.slice(0, 60), award: hit ? hit.title : award.slice(0, 70), reason: hit ? hit.reason : '' });
   }
-  return { rows, ignored };
+  return { rows, ignored, nameColumns: nameLike >= 2 && nameLike >= withAward * 0.6 };
 }
 
 /**

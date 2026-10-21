@@ -26,9 +26,11 @@ const GREY = '#4a4d52';
 const U = 1100; // page width in drawing units
 
 // Where the emblem sits, the signature row spans, and the text column, per design (fractions of width/height).
+// bottom: the seal center stays at least this many units above the page bottom, so its ribbon tails
+// never cross the frame on the shorter A4 page.
 const LAYOUT = {
-  classic: { emblem: [0.125, 0.79], row: [0.27, 0.92], cx: 0.5, tw: 0.74 },
-  ribbon: { emblem: [0.875, 0.79], row: [0.08, 0.73], cx: 0.5, tw: 0.72 },
+  classic: { emblem: [0.125, 0.79], bottom: 170, row: [0.27, 0.92], cx: 0.5, tw: 0.74 },
+  ribbon: { emblem: [0.875, 0.79], bottom: 152, row: [0.08, 0.73], cx: 0.5, tw: 0.72 },
   modern: { emblem: [0.11, 0.5], row: [0.28, 0.95], cx: 0.615, tw: 0.64 },
   confetti: { emblem: [0.13, 0.79], row: [0.27, 0.92], cx: 0.5, tw: 0.72 },
   trophy: { emblem: [0.125, 0.78], row: [0.27, 0.92], cx: 0.5, tw: 0.72 },
@@ -66,7 +68,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   const bodySerif = (z) => `italic 400 ${z}px ${SERIF}`;
 
   // Heading: spaced capitals.
-  const heading = String(cert.heading || '').trim().toUpperCase();
+  const heading = curly(cert.heading).toUpperCase();
   if (heading) {
     const sp = 0.14;
     const m = (t, z) => measure(headFont)(t, z) + sp * z * Math.max(0, t.length - 1);
@@ -80,7 +82,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   line(ctx, cx - 60, h * 0.245, cx + 60, h * 0.245);
   if (!ink) { ctx.fillStyle = P.accent; diamond(ctx, cx, h * 0.245, 6); }
 
-  const presented = String(cert.presented || '').trim();
+  const presented = curly(cert.presented);
   if (presented) {
     const size = fitSize(measure(bodySerif), presented, tw, 24, 12);
     ctx.fillStyle = GREY;
@@ -89,7 +91,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
 
   // Name on a line.
   const nameFont = (z) => `italic 700 ${z}px ${SERIF}`;
-  const name = String(cert.name || '').trim();
+  const name = curly(cert.name);
   const nameY = h * 0.45;
   ctx.strokeStyle = P.accent;
   ctx.lineWidth = 1.5;
@@ -104,7 +106,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   }
 
   // Award title: up to 2 lines.
-  const award = String(cert.award || '').trim();
+  const award = curly(cert.award);
   const awardFont = design === 'modern' ? (z) => `800 ${z}px ${SANS}` : (z) => `700 ${z}px ${SERIF}`;
   let y = h * 0.575;
   if (award) {
@@ -117,7 +119,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   }
 
   // Reason: up to 2 lines.
-  const reason = String(cert.reason || '').trim();
+  const reason = curly(cert.reason);
   if (reason) {
     const { lines, size } = wrapLines(measure(bodySerif), reason, tw * 0.92, 23, 12, 2);
     const lh = size * 1.3;
@@ -128,10 +130,10 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
 
   // Signature row: date, signature 1, signature 2 (empty slots are left out).
   const slots = [];
-  const date = String(cert.date || '').trim();
+  const date = curly(cert.date);
   if (date) slots.push({ value: date, label: 'Date' });
-  if (String(cert.sig1 || '').trim()) slots.push({ value: '', label: String(cert.sig1).trim() });
-  if (String(cert.sig2 || '').trim()) slots.push({ value: '', label: String(cert.sig2).trim() });
+  if (curly(cert.sig1)) slots.push({ value: '', label: curly(cert.sig1) });
+  if (curly(cert.sig2)) slots.push({ value: '', label: curly(cert.sig2) });
   if (slots.length) {
     const [r0, r1] = L.row.map((f) => f * U);
     const span = (r1 - r0) / slots.length;
@@ -156,17 +158,24 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   }
 
   const [ex, ey] = L.emblem;
-  EMBLEM[design](ctx, ex * U, ey * h, P);
+  EMBLEM[design](ctx, ex * U, L.bottom ? Math.min(ey * h, h - L.bottom) : ey * h, P);
   ctx.restore();
 }
 
 /** Text the canvas shows, for its accessible name. */
 export function describe(cert) {
   return [cert.heading, cert.presented, cert.name, cert.award, cert.reason, cert.date && `Date: ${cert.date}`, cert.sig1, cert.sig2]
-    .map((x) => String(x || '').trim()).filter(Boolean).join('. ');
+    .map((x) => String(x || '').trim().replace(/\.+$/, '')).filter(Boolean).join('. ');
 }
 
 // ---------- text helpers ----------
+/** Trimmed text with typographic quotes: "Why?" -> “Why?”, O'Brien -> O’Brien. */
+export function curly(t) {
+  return String(t || '').trim()
+    .replace(/(^|[\s(\[{\u2014-])"/g, '$1\u201c').replace(/"/g, '\u201d')
+    .replace(/(^|[\s(\[{\u2014-])'/g, '$1\u2018').replace(/'/g, '\u2019');
+}
+
 function centered(ctx, text, x, y, font, maxW) {
   ctx.font = font;
   ctx.textAlign = 'center';
@@ -212,17 +221,20 @@ function star(ctx, x, y, R, r, n = 5, rot = -Math.PI / 2) {
 function circle(ctx, x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); }
 function rect(ctx, x, y, w, h) { ctx.beginPath(); ctx.rect(x, y, w, h); }
 
-// A rosette made of a hypotrochoid curve (our own guilloche-style corner).
+// An engraved corner medallion: 16 fine overlapping petals inside two rings (our own guilloche-style art).
 function rosette(ctx, x, y, r) {
-  ctx.beginPath();
-  const R = 7, k = 3, d = 5.2;
-  for (let t = 0; t <= Math.PI * 2 * k + 0.01; t += 0.02) {
-    const px = (R - k) * Math.cos(t) + d * Math.cos(((R - k) / k) * t);
-    const py = (R - k) * Math.sin(t) - d * Math.sin(((R - k) / k) * t);
-    const f = r / (R - k + d);
-    t === 0 ? ctx.moveTo(x + px * f, y + py * f) : ctx.lineTo(x + px * f, y + py * f);
+  const lw = ctx.lineWidth;
+  ctx.lineWidth = 0.7;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.cos(a) * r * 0.42, y + Math.sin(a) * r * 0.42, r * 0.44, r * 0.15, a, 0, Math.PI * 2);
+    ctx.stroke();
   }
-  ctx.stroke();
+  ctx.lineWidth = lw;
+  circle(ctx, x, y, r); ctx.stroke();
+  circle(ctx, x, y, r * 0.88); ctx.lineWidth = 0.7; ctx.stroke();
+  ctx.lineWidth = lw;
 }
 
 // Ribbon tails under a seal.
@@ -230,9 +242,9 @@ function tails(ctx, x, y, r, color, dark) {
   const tail = (dir) => {
     ctx.beginPath();
     ctx.moveTo(x + dir * r * 0.15, y);
-    ctx.lineTo(x + dir * r * 0.75, y + r * 1.55);
-    ctx.lineTo(x + dir * r * 0.5, y + r * 1.35);
-    ctx.lineTo(x + dir * r * 0.28, y + r * 1.62);
+    ctx.lineTo(x + dir * r * 0.72, y + r * 1.33);
+    ctx.lineTo(x + dir * r * 0.49, y + r * 1.16);
+    ctx.lineTo(x + dir * r * 0.28, y + r * 1.4);
     ctx.lineTo(x - dir * r * 0.2, y + r * 0.2);
     ctx.closePath();
     ctx.fillStyle = color; ctx.fill();
@@ -276,6 +288,11 @@ function trophy(ctx, x, y, P) {
   ctx.bezierCurveTo(x - 22, y + 6, x - 46, y - 10, x - 46, y - 62);
   ctx.closePath();
   ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = d; ctx.stroke();
+  // Soft shine on the left of the cup.
+  ctx.beginPath();
+  ctx.moveTo(x - 34, y - 56); ctx.bezierCurveTo(x - 34, y - 26, x - 24, y - 8, x - 12, y);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 5; ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeStyle = d;
   // Stem and base.
   rect(ctx, x - 7, y + 10, 14, 22); ctx.fillStyle = g; ctx.fill(); ctx.stroke();
   rect(ctx, x - 30, y + 32, 60, 12); ctx.fillStyle = d; ctx.fill();
@@ -284,12 +301,19 @@ function trophy(ctx, x, y, P) {
 }
 
 function medal(ctx, x, y, P) {
-  // Ribbon V.
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.moveTo(x - 34, y - 120); ctx.lineTo(x - 8, y - 120); ctx.lineTo(x + 18, y - 30); ctx.lineTo(x - 8, y - 30); ctx.closePath(); ctx.fill();
-  ctx.globalAlpha = 0.7;
-  ctx.beginPath(); ctx.moveTo(x + 34, y - 120); ctx.lineTo(x + 8, y - 120); ctx.lineTo(x - 18, y - 30); ctx.lineTo(x + 8, y - 30); ctx.closePath(); ctx.fill();
-  ctx.globalAlpha = 1;
+  // Neck ribbon: two crossed straps, each white with a stripe in the accent color.
+  const strap = (dir, shade) => {
+    const quad = (a, b) => {
+      ctx.beginPath();
+      // Each strap runs from the top outer corner down to the far side of the medal top (a V).
+      ctx.moveTo(x + dir * (40 - a), y - 130); ctx.lineTo(x + dir * (40 - b), y - 130);
+      ctx.lineTo(x + dir * (16 - b), y - 30); ctx.lineTo(x + dir * (16 - a), y - 30); ctx.closePath(); ctx.fill();
+    };
+    ctx.fillStyle = shade; quad(0, 30);
+    ctx.fillStyle = P.accent; quad(11, 19);
+  };
+  strap(-1, '#d9dde6');
+  strap(1, '#ffffff');
   circle(ctx, x, y, 52); ctx.fillStyle = P.accent; ctx.fill();
   circle(ctx, x, y, 42); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
   star(ctx, x, y, 26, 11, 5); ctx.fillStyle = '#ffffff'; ctx.fill();
@@ -298,17 +322,18 @@ function medal(ctx, x, y, P) {
 // ---------- designs ----------
 const DECOR = {
   classic(ctx, h, P) {
+    // Outer ink starts about 0.3 in from the paper edge, inside a home printer's margin.
     ctx.strokeStyle = P.primary; ctx.lineWidth = 9;
-    rect(ctx, 26, 26, U - 52, h - 52); ctx.stroke();
+    rect(ctx, 34, 34, U - 68, h - 68); ctx.stroke();
     ctx.strokeStyle = P.accent; ctx.lineWidth = 2;
-    rect(ctx, 44, 44, U - 88, h - 88); ctx.stroke();
+    rect(ctx, 51, 51, U - 102, h - 102); ctx.stroke();
     ctx.lineWidth = 1;
-    rect(ctx, 50, 50, U - 100, h - 100); ctx.stroke();
+    rect(ctx, 57, 57, U - 114, h - 114); ctx.stroke();
     ctx.lineWidth = 1.2;
-    for (const [x, y] of [[50, 50], [U - 50, 50], [50, h - 50], [U - 50, h - 50]]) {
-      circle(ctx, x, y, 30); ctx.fillStyle = '#ffffff'; ctx.fill();
-      ctx.strokeStyle = P.accent; rosette(ctx, x, y, 26);
-      circle(ctx, x, y, 4); ctx.fillStyle = P.primary; ctx.fill();
+    for (const [x, y] of [[57, 57], [U - 57, 57], [57, h - 57], [U - 57, h - 57]]) {
+      circle(ctx, x, y, 27); ctx.fillStyle = '#ffffff'; ctx.fill();
+      ctx.strokeStyle = P.accent; rosette(ctx, x, y, 24);
+      circle(ctx, x, y, 3.5); ctx.fillStyle = P.primary; ctx.fill();
     }
   },
   ribbon(ctx, h, P) {
@@ -342,11 +367,14 @@ const DECOR = {
     rect(ctx, 34, 34, U - 68, h - 68); ctx.stroke();
     const cols = [P.primary, P.accent, '#d9486b', '#2a9d8f', '#f2a541'];
     const rnd = seeded(7);
+    // Pieces stay inside a printer-safe margin and off the frame line, and out of the text area.
     const inSafe = (x, y) => x > 120 && x < U - 120 && y > 120 && y < h - 70;
+    const clear = (x, y) => (y > h * 0.76 && x > 0.25 * U && x < 0.94 * U) || Math.hypot(x - 0.13 * U, y - 0.79 * h) < 90;
+    const offEdge = (x, y) => x < 24 || x > U - 24 || y < 24 || y > h - 24 || Math.abs(x - 34) < 10 || Math.abs(x - (U - 34)) < 10 || Math.abs(y - 34) < 10 || Math.abs(y - (h - 34)) < 10;
     let placed = 0;
     for (let i = 0; placed < 120 && i < 2000; i++) {
       const x = rnd() * U, y = rnd() * h;
-      if (inSafe(x, y)) continue;
+      if (inSafe(x, y) || offEdge(x, y) || clear(x, y)) continue;
       placed++;
       ctx.fillStyle = cols[Math.floor(rnd() * cols.length)];
       ctx.strokeStyle = ctx.fillStyle;

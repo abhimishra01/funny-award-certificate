@@ -110,7 +110,7 @@ select.ctl { padding-right: 6px; }
 
 .fc-form { display: grid; gap: 14px; min-width: 0; }
 .fc-group { border: 1px solid var(--line-strong); border-radius: 14px; background: var(--card); padding: 6px 16px 16px; min-width: 0; }
-.fc-group[hidden] { display: none; }
+.fc-group[hidden], .fc-check[hidden] { display: none; }
 .fc-group legend { padding: 0 6px; margin-left: -6px; font-weight: 700; font-size: 1rem; }
 .fc-field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: .9375rem; font-weight: 600; min-width: 0; }
 .fc-field .ctl { font-weight: 400; }
@@ -173,6 +173,6 @@ select.ctl { padding-right: 6px; }
   html.fc-printing, html.fc-printing body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
   html.fc-printing body > *:not(#fc-print-pages) { display: none !important; }
   html.fc-printing #fc-print-pages { display: block; }
-  #fc-print-pages img { display: block; width: 100vw; height: 100vh; object-fit: contain; break-after: page; }
-  #fc-print-pages img:last-child { break-after: auto; }
+  #fc-print-pages > * { display: block; width: 100vw; height: 100vh; object-fit: contain; break-after: page; }
+  #fc-print-pages > :last-child { break-after: auto; }
 }

@@ -5,7 +5,7 @@ import { serve, launch, SECRET, entry } from './e2e-lib.mjs';
 
 const srv = await serve();
 const browser = await launch();
-const ctx = await browser.newContext({ acceptDownloads: true });
+const ctx = await browser.newContext({ acceptDownloads: true, locale: 'en-US' });
 // window.print would block a headless run; stand in for it and fire afterprint like a real browser.
 await ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; setTimeout(() => dispatchEvent(new Event('afterprint')), 50); }; });
 const page = await ctx.newPage();

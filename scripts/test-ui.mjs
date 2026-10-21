@@ -12,7 +12,7 @@ const ok = (cond, msg) => { checks++; if (verbose) console.log('ok', msg); asser
 const eq = (a, b, msg) => { checks++; if (verbose) console.log('eq', msg); assert.deepEqual(a, b, msg); };
 
 async function newPage(opts = {}, ctxIn) {
-  const ctx = ctxIn || await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true, ...opts });
+  const ctx = ctxIn || await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true, locale: 'en-US', ...opts });
   await ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; window.__printPages = document.querySelectorAll('#fc-print-pages img').length; window.__printClass = document.documentElement.classList.contains('fc-printing'); setTimeout(() => dispatchEvent(new Event('afterprint')), 50); }; });
   const page = await ctx.newPage();
   page.errors = [];
@@ -198,6 +198,54 @@ for (const scheme of ['light', 'dark']) {
   await page.context().close();
 }
 
+// ---------- batch PDF shares one background; "Last, First" lists get a one-click fix
+{
+  const page = await newPage();
+  await page.click('input[name="mode"][value="many"]', { force: true });
+  await page.fill('#fc-list', 'Brooks, Ava\nChen, Liam\nHaddad, Noor');
+  await settle(page);
+  ok(await page.isVisible('#fc-namesonly'), 'names-only fix offered for a Last, First list');
+  ok((await label(page)).includes('Brooks') && (await label(page)).includes('Ava'), 'before the fix, Ava reads as an award');
+  await page.check('#fc-namesonly');
+  await settle(page);
+  ok((await label(page)).includes('Ava Brooks'), 'after the fix: Ava Brooks');
+  eq((await page.innerText('#fc-count')).trim(), '3 certificates.', 'names-only count');
+  const s = (await download(page, '#fc-pdf')).bytes.toString('latin1');
+  eq((s.match(/\/Type \/Page /g) || []).length, 3, 'shared pdf has 3 pages');
+  eq((s.match(/\/Width 2200 \/Height 1700 /g) || []).length, 1, 'background image stored once');
+  eq((s.match(/\/Bg 4 0 R/g) || []).length, 3, 'every page shows the background');
+  await page.fill('#fc-list', 'Ava, Super Helper Award\nLiam');
+  await settle(page);
+  await page.uncheck('#fc-namesonly');
+  await settle(page);
+  ok(!(await page.isVisible('#fc-namesonly')), 'fix hides when the list has real awards');
+  eq(page.errors, [], 'console errors (names-only)');
+  await page.context().close();
+}
+
+// ---------- paper follows the visitor's region when nothing is saved
+for (const [locale, paper] of [['en-US', 'letter'], ['en-CA', 'letter'], ['en-GB', 'a4'], ['de-DE', 'a4'], ['en-IN', 'a4']]) {
+  const page = await newPage({ locale });
+  eq(await page.$eval('input[name="paper"]:checked', (e) => e.value), paper, `default paper for ${locale}`);
+  await page.context().close();
+}
+
+// ---------- Ctrl+P (no Print button) prints the certificate, not the web page
+for (const [paper, size] of [['letter', [792, 612]], ['a4', [842, 595]]]) {
+  const page = await newPage();
+  await page.click(`input[name="paper"][value="${paper}"]`, { force: true });
+  await page.fill('#fc-name', 'Keyboard Kim');
+  await page.evaluate(() => dispatchEvent(new Event('beforeprint')));
+  ok(await page.evaluate(() => document.documentElement.classList.contains('fc-printing') && !!document.querySelector('#fc-print-pages canvas')), `${paper}: Ctrl+P prepares the certificate`);
+  await page.emulateMedia({ media: 'print' });
+  const pdf = (await page.pdf({ preferCSSPageSize: true, printBackground: true })).toString('latin1');
+  const boxes = [...pdf.matchAll(/\/MediaBox \[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/g)].map((m) => [Math.round(+m[1]), Math.round(+m[2])]);
+  eq(boxes, [size], `${paper}: Ctrl+P gives one sheet of the right size`);
+  await page.evaluate(() => dispatchEvent(new Event('afterprint')));
+  ok(await page.evaluate(() => !document.documentElement.classList.contains('fc-printing') && !document.getElementById('fc-print-pages')), `${paper}: Ctrl+P clean-up`);
+  await page.context().close();
+}
+
 // ---------- main controls on a phone (390)
 {
   const page = await newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -258,7 +306,7 @@ for (const scheme of ['light', 'dark']) {
 // ---------- other pages at phone widths: no sideways scroll
 for (const scheme of ['light', 'dark']) {
   for (const w of [390, 320]) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, colorScheme: scheme, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, colorScheme: scheme, isMobile: true, hasTouch: true, locale: 'en-US' });
     const page = await ctx.newPage();
     for (const path of ['about/', 'contact/', 'privacy/', 'terms/', '404.html']) {
       await page.goto(srv.url + entry + path);
@@ -274,7 +322,7 @@ for (const scheme of ['light', 'dark']) {
   const axePath = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
   for (const scheme of ['light', 'dark']) {
     for (const path of ['', 'about/', 'privacy/']) {
-      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: scheme });
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: scheme, locale: 'en-US' });
       const page = await ctx.newPage();
       await page.goto(srv.url + entry + path);
       await page.addScriptTag({ path: axePath });
@@ -288,7 +336,7 @@ for (const scheme of ['light', 'dark']) {
 
 // ---------- real print output: one sheet per certificate, no blank last page
 for (const [paper, size] of [['letter', [792, 612]], ['a4', [842, 595]]]) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-US' });
   // Keep the print pages in place (no afterprint) so the print layout can be rendered.
   await ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; });
   const page = await ctx.newPage();

@@ -67,6 +67,7 @@ const first = AUDIENCES[0].awards[0];
       <label class="fc-field">One person per line. To give someone their own award, add it after a comma or a tab.
         <textarea id="fc-list" class="ctl fc-list" rows="7" spellcheck="false" placeholder={'Ava Brooks\nLiam Chen, Super Helper Award\n"Lee, Sam", Math Magician Award'}></textarea>
       </label>
+      <label class="fc-check" id="fc-namesonly-row" hidden><input type="checkbox" id="fc-namesonly" /> <span>Each line is one person. Read “Brooks, Ava” as Ava Brooks, and two name columns as one name.</span></label>
       <label class="fc-check"><input type="checkbox" id="fc-each" /> <span>Give each person a different random award</span></label>
       <div class="fc-row2 fc-countrow">
         <p class="hint" id="fc-count" aria-live="polite">No names yet.</p>

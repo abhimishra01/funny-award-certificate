@@ -6,8 +6,13 @@ import { buildPdf } from './pdf.js';
 
 const KEY = 'fac-settings-v1';
 const SAVED = ['design', 'color', 'paper', 'audience', 'heading', 'presented', 'sig1', 'sig2'];
+// US Letter where people use it; A4 everywhere else.
+const LETTER_REGIONS = ['US', 'CA', 'MX', 'PH', 'CL', 'CO', 'VE', 'PR', 'GT', 'CR', 'PA', 'DO', 'SV', 'NI', 'HN'];
+const localPaper = () => {
+  try { return LETTER_REGIONS.includes(new Intl.Locale(navigator.language).maximize().region) ? 'letter' : 'a4'; } catch { return 'letter'; }
+};
 const DEFAULTS = {
-  design: 'classic', color: 'navy', paper: 'letter', audience: 'office',
+  design: 'classic', color: 'navy', paper: localPaper(), audience: 'office',
   heading: 'Certificate of Achievement', presented: 'This award is proudly presented to', sig1: 'Awards Committee', sig2: '',
 };
 
@@ -23,7 +28,7 @@ export function initTool() {
   const stage = $('fc-stage');
   const f = {
     audience: $('fc-audience'), idea: $('fc-idea'), award: $('fc-award'), reason: $('fc-reason'),
-    name: $('fc-name'), list: $('fc-list'), each: $('fc-each'), heading: $('fc-heading'),
+    name: $('fc-name'), list: $('fc-list'), each: $('fc-each'), namesOnly: $('fc-namesonly'), heading: $('fc-heading'),
     presented: $('fc-presented'), date: $('fc-date'), sig1: $('fc-sig1'), sig2: $('fc-sig2'),
   };
   const status = $('fc-status');
@@ -80,7 +85,9 @@ export function initTool() {
   });
   const many = () => radio('mode') === 'many';
   const refreshBatch = () => {
-    const { rows, ignored } = parseBatch(f.list.value);
+    const { rows, ignored, nameColumns } = parseBatch(f.list.value, MAX_BATCH, { namesOnly: f.namesOnly.checked });
+    // "Brooks, Ava" from a school export reads as name Brooks with award Ava. Offer the fix; do not guess.
+    $('fc-namesonly-row').hidden = !(nameColumns || f.namesOnly.checked);
     // A fixed seed keeps the random awards stable while you type; Shuffle picks a new seed.
     batch = resolveBatch(rows, form(), { random: f.each.checked, pool: pool(), rng: seeded(seed * 2654435761) });
     if (page >= batch.length) page = Math.max(0, batch.length - 1);
@@ -131,14 +138,17 @@ export function initTool() {
 
   // ---------- exports ----------
   const work = document.createElement('canvas');
+  const workCtx = work.getContext('2d', { willReadFrequently: true });
+  const band = document.createElement('canvas');
   const renderPage = (c) => {
     const paper = radio('paper') || 'letter';
     const { w, h } = pixelSize(paper, DPI);
     work.width = w; work.height = h;
-    drawCertificate(work.getContext('2d'), w, h, c, { design: radio('design'), color: radio('color') });
+    drawCertificate(workCtx, w, h, c, { design: radio('design'), color: radio('color') });
     return { w, h };
   };
-  const blobOf = (type, q) => new Promise((res, rej) => work.toBlob((b) => (b ? res(b) : rej(new Error('Could not make the image.'))), type, q));
+  const blobOf = (type, q, cv = work) => new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('Could not make the image.'))), type, q));
+  const bytesOf = async (blob) => new Uint8Array(await blob.arrayBuffer());
   const download = (blob, name) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -174,10 +184,61 @@ export function initTool() {
     return pages;
   };
 
+  // Batch PDF: every page shares the same art, heading, date and signature lines. Draw that once as a
+  // background, then store per page only the band of pixels that differs from it (name, award, reason).
+  // Each band is cut from that page's full render, so the printed page matches the preview exactly.
+  // A class of 30 drops from about 7 MB to about 3 MB.
+  const sharedPages = async (list) => {
+    const { w, h } = renderPage({ ...list[0], name: '', award: '', reason: '' });
+    const bg = new Uint32Array(workCtx.getImageData(0, 0, w, h).data.buffer);
+    const background = { w, h, jpeg: await bytesOf(await blobOf('image/jpeg', 0.85)) };
+    const pages = [];
+    const snap = (v) => Math.floor(v / 16) * 16;
+    const WHITE = 0xffffffff;
+    for (let i = 0; i < list.length; i++) {
+      say(`Making page ${i + 1} of ${list.length}…`);
+      renderPage(list[i]);
+      const cur = new Uint32Array(workCtx.getImageData(0, 0, w, h).data.buffer);
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let y = 0; y < h; y++) {
+        const row = y * w;
+        for (let x = 0; x < w; x++) {
+          if (cur[row + x] !== bg[row + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+        }
+      }
+      if (x1 < 0) { x0 = 0; y0 = 0; x1 = 15; y1 = 15; }
+      // Pad by one JPEG block and snap to the 16 px grid, so the band edge falls on matching blocks.
+      x0 = snap(Math.max(0, x0 - 16)); y0 = snap(Math.max(0, y0 - 16));
+      x1 = Math.min(w, snap(x1 + 32)); y1 = Math.min(h, snap(y1 + 32));
+      // Keep every band edge on plain white paper, with 3 px of white on both sides of it. PDF viewers
+      // blend an image edge into what is under it, so an edge on art (the trophy, a seal) can show a
+      // faint line. Grow the band past any art it touches.
+      const rowWhite = (y) => { if (y < 0 || y >= h) return true; for (let x = Math.max(0, x0 - 3); x < Math.min(w, x1 + 3); x++) if (cur[y * w + x] !== WHITE) return false; return true; };
+      const colWhite = (x) => { if (x < 0 || x >= w) return true; for (let y = Math.max(0, y0 - 3); y < Math.min(h, y1 + 3); y++) if (cur[y * w + x] !== WHITE) return false; return true; };
+      const strip = (at, fn) => { for (let d = -3; d < 3; d++) if (!fn(at + d)) return false; return true; };
+      for (let grew = true; grew;) {
+        grew = false;
+        if (y0 > 0 && !strip(y0, rowWhite)) { y0 = Math.max(0, y0 - 16); grew = true; }
+        if (y1 < h && !strip(y1, rowWhite)) { y1 = Math.min(h, y1 + 16); grew = true; }
+        if (x0 > 0 && !strip(x0, colWhite)) { x0 = Math.max(0, x0 - 16); grew = true; }
+        if (x1 < w && !strip(x1, colWhite)) { x1 = Math.min(w, x1 + 16); grew = true; }
+      }
+      band.width = x1 - x0; band.height = y1 - y0;
+      band.getContext('2d').drawImage(work, x0, y0, band.width, band.height, 0, 0, band.width, band.height);
+      pages.push({ x: x0, y: y0, w: band.width, h: band.height, jpeg: await bytesOf(await blobOf('image/jpeg', 0.85, band)) });
+      await nextFrame();
+    }
+    return { pages, background };
+  };
+
   $('fc-pdf').addEventListener('click', () => guard($('fc-pdf'), async () => {
     const list = certs();
-    const pages = await jpegPages(list, true);
-    const pdf = buildPdf(pages, PAPERS[radio('paper')] || PAPERS.letter, 'Award certificate');
+    const paperBox = PAPERS[radio('paper')] || PAPERS.letter;
+    let pdf;
+    if (list.length > 1) {
+      const { pages, background } = await sharedPages(list);
+      pdf = buildPdf(pages, paperBox, 'Award certificate', { background });
+    } else pdf = buildPdf(await jpegPages(list, true), paperBox, 'Award certificate');
     download(new Blob([pdf], { type: 'application/pdf' }), fileName(list[0].name, 'pdf', list.length));
     say(list.length > 1 ? `PDF ready: ${list.length} pages.` : 'PDF ready. Check your downloads.');
   }));
@@ -219,11 +280,37 @@ export function initTool() {
       window.removeEventListener('afterprint', done);
     };
     window.addEventListener('afterprint', done);
-    say(list.length > 1 ? `Printing ${list.length} pages. In the print window, choose landscape and no margins if asked.` : 'Opening the print window.');
+    say(list.length > 1 ? `Printing ${list.length} pages. In the print window, choose Landscape and no margins if asked.` : 'Opening the print window. Choose Landscape and no margins if asked.');
     window.print();
     // Some browsers do not fire afterprint; clean up after a while anyway.
     setTimeout(() => { if (document.documentElement.classList.contains('fc-printing')) done(); }, 60000);
   }));
+
+  // Ctrl+P, Cmd+P or the browser menu skip the Print button. Print the certificate on screen anyway,
+  // not the web page. A canvas paints at once, so it is ready before the print layout is made.
+  window.addEventListener('beforeprint', () => {
+    if (document.documentElement.classList.contains('fc-printing')) return;
+    const list = certs();
+    const { w, h } = renderPage(list[Math.min(page, list.length - 1)]);
+    const sheet = document.createElement('canvas');
+    sheet.width = w; sheet.height = h;
+    sheet.getContext('2d').drawImage(work, 0, 0);
+    const box = document.createElement('div');
+    box.id = 'fc-print-pages';
+    box.append(sheet);
+    document.getElementById('fc-print-pages')?.remove();
+    document.body.append(box);
+    let style = document.getElementById('fc-print-style');
+    if (!style) { style = document.createElement('style'); style.id = 'fc-print-style'; document.head.append(style); }
+    style.textContent = `@page { size: ${radio('paper') === 'a4' ? 'A4' : 'letter'} landscape; margin: 0; }`;
+    document.documentElement.classList.add('fc-printing');
+    const done = () => {
+      document.documentElement.classList.remove('fc-printing');
+      box.remove();
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+  });
 
   // ---------- events ----------
   const onText = () => { refreshBatch(); schedule(); };
@@ -247,6 +334,7 @@ export function initTool() {
   }
   f.list.addEventListener('input', onText);
   f.each.addEventListener('change', onText);
+  f.namesOnly.addEventListener('change', onText);
   $('fc-shuffle').addEventListener('click', () => { seed++; onText(); });
   $('fc-prev').addEventListener('click', () => { if (page > 0) { page--; schedule(); } });
   $('fc-next').addEventListener('click', () => { if (page < certs().length - 1) { page++; schedule(); } });
@@ -278,7 +366,9 @@ export function initTool() {
   new ResizeObserver(() => schedule()).observe(stage);
 
   // ---------- start ----------
-  apply(load());
+  const saved = load();
+  if (typeof saved.paper !== 'string') setRadio('paper', DEFAULTS.paper);
+  apply(saved);
   f.date.value = formatDate(new Date());
   if (f.audience.value !== 'office') { fillIdeas(); useAward(pool()[0]); } else syncIdea();
   renderThumbs();
