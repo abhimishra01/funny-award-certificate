@@ -82,7 +82,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
 
   const presented = String(cert.presented || '').trim();
   if (presented) {
-    const size = fitSize(measure(bodySerif), presented, tw, 22, 12);
+    const size = fitSize(measure(bodySerif), presented, tw, 24, 12);
     ctx.fillStyle = GREY;
     centered(ctx, presented, cx, h * 0.325, bodySerif(size), tw);
   }
@@ -119,7 +119,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   // Reason: up to 2 lines.
   const reason = String(cert.reason || '').trim();
   if (reason) {
-    const { lines, size } = wrapLines(measure(bodySerif), reason, tw * 0.92, 21, 12, 2);
+    const { lines, size } = wrapLines(measure(bodySerif), reason, tw * 0.92, 23, 12, 2);
     const lh = size * 1.3;
     const top = Math.max(y + 50, h * 0.655);
     ctx.fillStyle = GREY;
@@ -143,12 +143,12 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
       ctx.lineWidth = 1.2;
       line(ctx, x - lw / 2, ly, x + lw / 2, ly);
       const lf = (z) => `400 ${z}px ${design === 'modern' ? SANS : SERIF}`;
-      const ls = fitSize(measure(lf), sl.label, lw, 16, 9);
+      const ls = fitSize(measure(lf), sl.label, lw, 18, 9);
       ctx.fillStyle = GREY;
-      centered(ctx, sl.label, x, ly + 24, lf(ls), lw);
+      centered(ctx, sl.label, x, ly + 26, lf(ls), lw);
       if (sl.value) {
         const vf = (z) => `italic 400 ${z}px ${SERIF}`;
-        const vs = fitSize(measure(vf), sl.value, lw, 20, 10);
+        const vs = fitSize(measure(vf), sl.value, lw, 22, 10);
         ctx.fillStyle = INK;
         centered(ctx, sl.value, x, ly - 10, vf(vs), lw);
       }

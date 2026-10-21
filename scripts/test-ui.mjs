@@ -7,8 +7,9 @@ import { serve, launch, entry } from './e2e-lib.mjs';
 const srv = await serve();
 const browser = await launch();
 let checks = 0;
-const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
-const eq = (a, b, msg) => { checks++; assert.deepEqual(a, b, msg); };
+const verbose = !!process.env.FC_VERBOSE;
+const ok = (cond, msg) => { checks++; if (verbose) console.log('ok', msg); assert.ok(cond, msg); };
+const eq = (a, b, msg) => { checks++; if (verbose) console.log('eq', msg); assert.deepEqual(a, b, msg); };
 
 async function newPage(opts = {}, ctxIn) {
   const ctx = ctxIn || await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true, ...opts });
@@ -149,6 +150,7 @@ for (const scheme of ['light', 'dark']) {
   eq(await page.innerText('#fc-page'), '2 of 3', 'pager 2');
   ok((await label(page)).includes('Lee, Sam') && (await label(page)).includes('Math Magician Award'), 'row 2 own award');
   await page.click('#fc-next');
+  await settle(page);
   ok(await page.isDisabled('#fc-next'), 'next stops at the end');
   eq(await page.innerText('#fc-pdf'), 'Download PDF (3 pages)', 'pdf button counts pages');
   const pdf = await download(page, '#fc-pdf');
@@ -163,7 +165,8 @@ for (const scheme of ['light', 'dark']) {
   ok(await page.isVisible('#fc-shuffle'), 'shuffle shows');
   const titles = async () => {
     const out = [];
-    await page.evaluate(() => { while (!document.getElementById('fc-prev').disabled) document.getElementById('fc-prev').click(); });
+    for (let k = 0; k < 10 && !(await page.isDisabled('#fc-prev')); k++) { await page.click('#fc-prev'); await settle(page); }
+    await settle(page);
     for (let i = 0; i < 4; i++) { await settle(page); out.push(await label(page)); if (i < 3) await page.click('#fc-next'); }
     return out;
   };
