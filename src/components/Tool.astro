@@ -1,0 +1,133 @@
+---
+// The certificate maker. Markup only; the logic is in src/lib/cert/ui.js.
+// The preview box has a fixed aspect ratio from the first paint, so the page does not jump.
+import { AUDIENCES } from '../lib/cert/awards.js';
+import { DESIGNS, COLORS } from '../lib/cert/draw.js';
+const first = AUDIENCES[0].awards[0];
+---
+<section id="tool" class="fc" aria-label="Award certificate maker">
+  <div class="fc-preview">
+    <div class="fc-stage" id="fc-stage" data-paper="letter">
+      <canvas id="fc-canvas" role="img" aria-label="Certificate preview"></canvas>
+    </div>
+    <p class="fc-caption"><span class="fc-tag">Preview</span> Edit the text in the form. What you see is what prints.</p>
+    <div class="fc-pager" id="fc-pager" hidden>
+      <button type="button" class="btn-sm" id="fc-prev">Previous</button>
+      <span id="fc-page">1 of 1</span>
+      <button type="button" class="btn-sm" id="fc-next">Next</button>
+    </div>
+    <div class="fc-actions" role="group" aria-label="Save or print">
+      <button type="button" class="btn btn-primary" id="fc-pdf">Download PDF</button>
+      <button type="button" class="btn" id="fc-png">PNG</button>
+      <button type="button" class="btn" id="fc-print">Print</button>
+    </div>
+    <p class="fc-status" id="fc-status" role="status" aria-live="polite"></p>
+  </div>
+
+  <form class="fc-form" id="fc-form" autocomplete="off">
+    <div class="fc-seg" role="radiogroup" aria-label="How many certificates">
+      <label><input type="radio" name="mode" value="one" checked /> <span>One certificate</span></label>
+      <label><input type="radio" name="mode" value="many" /> <span>Many names</span></label>
+    </div>
+
+    <fieldset class="fc-group">
+      <legend>Award</legend>
+      <div class="fc-row2">
+        <label class="fc-field">For
+          <select id="fc-audience" class="ctl">
+            {AUDIENCES.map((a) => <option value={a.id}>{a.label}</option>)}
+          </select>
+        </label>
+        <button type="button" class="btn fc-random" id="fc-random">Random award</button>
+      </div>
+      <label class="fc-field">Award ideas
+        <select id="fc-idea" class="ctl">
+          <option value="">Pick from {AUDIENCES[0].awards.length} ideas</option>
+          {AUDIENCES[0].awards.map(([t], i) => <option value={String(i)} selected={i === 0}>{t}</option>)}
+        </select>
+      </label>
+      <label class="fc-field">Award title
+        <input id="fc-award" class="ctl" type="text" maxlength="70" value={first[0]} />
+      </label>
+      <label class="fc-field">Reason line <span class="fc-opt">(optional)</span>
+        <textarea id="fc-reason" class="ctl" rows="2" maxlength="140">{first[1]}</textarea>
+      </label>
+    </fieldset>
+
+    <fieldset class="fc-group" id="fc-one">
+      <legend>Name</legend>
+      <label class="fc-field"><span class="sr-only">Name on the certificate</span>
+        <input id="fc-name" class="ctl" type="text" maxlength="60" placeholder="Type a name" autocapitalize="words" spellcheck="false" />
+      </label>
+      <p class="hint">Leave it empty to write the name by hand.</p>
+    </fieldset>
+
+    <fieldset class="fc-group" id="fc-many" hidden>
+      <legend>Names</legend>
+      <label class="fc-field">One person per line. To give someone their own award, add it after a comma or a tab.
+        <textarea id="fc-list" class="ctl fc-list" rows="7" spellcheck="false" placeholder={'Ava Brooks\nLiam Chen, Super Helper Award\n"Lee, Sam", Math Magician Award'}></textarea>
+      </label>
+      <label class="fc-check"><input type="checkbox" id="fc-each" /> <span>Give each person a different random award</span></label>
+      <div class="fc-row2 fc-countrow">
+        <p class="hint" id="fc-count" aria-live="polite">No names yet.</p>
+        <button type="button" class="btn-sm" id="fc-shuffle" hidden>Shuffle awards</button>
+      </div>
+      <p class="hint">Put a name in quotes if it has a comma. You can paste two columns from a spreadsheet.</p>
+    </fieldset>
+
+    <fieldset class="fc-group">
+      <legend>Design</legend>
+      <div class="fc-designs">
+        {DESIGNS.map((d, i) => (
+          <label class="fc-design">
+            <input type="radio" name="design" value={d.id} checked={i === 0} />
+            <canvas class="fc-thumb" data-design={d.id} width="160" height="124" aria-hidden="true"></canvas>
+            <span>{d.label}</span>
+          </label>
+        ))}
+      </div>
+      <p class="fc-sublabel" id="fc-color-label">Color</p>
+      <div class="fc-swatches" role="radiogroup" aria-labelledby="fc-color-label">
+        {COLORS.map((c, i) => (
+          <label class="fc-swatch" title={c.label}>
+            <input type="radio" name="color" value={c.id} checked={i === 0} />
+            <span class="fc-dot" style={`--sw:${c.primary};--sw2:${c.accent}`} aria-hidden="true"></span>
+            <span class="sr-only">{c.label}</span>
+          </label>
+        ))}
+      </div>
+      <p class="fc-sublabel" id="fc-paper-label">Paper</p>
+      <div class="fc-seg" role="radiogroup" aria-labelledby="fc-paper-label">
+        <label><input type="radio" name="paper" value="letter" checked /> <span>US Letter</span></label>
+        <label><input type="radio" name="paper" value="a4" /> <span>A4</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="fc-group">
+      <legend>More text</legend>
+      <label class="fc-field">Top line
+        <input id="fc-heading" class="ctl" type="text" maxlength="40" value="Certificate of Achievement" />
+      </label>
+      <label class="fc-field">Line above the name
+        <input id="fc-presented" class="ctl" type="text" maxlength="60" value="This award is proudly presented to" />
+      </label>
+      <label class="fc-field">Date
+        <input id="fc-date" class="ctl" type="text" maxlength="40" />
+      </label>
+      <div class="fc-row2 fc-sigs">
+        <label class="fc-field">Signature line 1
+          <input id="fc-sig1" class="ctl" type="text" maxlength="40" value="Awards Committee" />
+        </label>
+        <label class="fc-field">Signature line 2 <span class="fc-opt">(optional)</span>
+          <input id="fc-sig2" class="ctl" type="text" maxlength="40" placeholder="For example: Principal" />
+        </label>
+      </div>
+      <button type="button" class="link" id="fc-reset">Reset text and design</button>
+    </fieldset>
+  </form>
+</section>
+
+<script>
+  import { initTool } from '../lib/cert/ui.js';
+  initTool();
+</script>

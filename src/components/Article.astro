@@ -1,0 +1,70 @@
+---
+// SEO article below the tool. The award idea lists come from the same pool as the tool,
+// and each "Use this award" button fills the certificate (wired in src/lib/cert/ui.js).
+import { AUDIENCES } from '../lib/cert/awards.js';
+const PICKS = 8;
+const heads = {
+  office: 'Funny awards for coworkers',
+  students: 'Funny awards for students',
+  sports: 'Funny awards for a sports team',
+  family: 'Funny family awards',
+  friends: 'Funny awards for friends',
+};
+const total = AUDIENCES.reduce((n, a) => n + a.awards.length, 0);
+---
+<section aria-labelledby="about-tool" class="mx-auto max-w-5xl px-4 pt-16">
+  <article class="prose-site fc-article">
+    <h2 id="about-tool" style="margin-top:0">How to make a funny award certificate</h2>
+    <p>This funny award certificate maker turns a name and a silly title into a printable certificate in a few seconds. It has {total} kind award ideas for coworkers, students, sports teams, family and friends. You can print it, save a PDF or save a PNG to send in a chat. There is no sign-up and no watermark.</p>
+    <ol>
+      <li>Choose who the awards are for. Then pick an idea from the list, or press <strong>Random award</strong> until one fits.</li>
+      <li>Type the name. Change the title or the reason line if you want a private joke.</li>
+      <li>Choose a design, a color and US Letter or A4 paper.</li>
+      <li>Press <strong>Download PDF</strong>, <strong>PNG</strong> or <strong>Print</strong>.</li>
+    </ol>
+
+    <h2>Funny award ideas</h2>
+    <p>The best funny awards point at a habit people love about the person. Here are some favorites from each list. Press a button to put the award on the certificate above.</p>
+    {AUDIENCES.map((a) => (
+      <>
+        <h3>{heads[a.id]}</h3>
+        <ul class="fc-ideas">
+          {a.awards.slice(0, PICKS).map(([title, reason], i) => (
+            <li>
+              <span><strong>{title}.</strong> {reason}</span>
+              <button type="button" class="btn-sm" data-use-award={`${a.id}:${i}`} aria-label={`Use this award: ${title}`}>Use this award</button>
+            </li>
+          ))}
+        </ul>
+        <p class="fc-more">The tool has {a.awards.length - PICKS} more {heads[a.id].toLowerCase()} in the Award ideas list.</p>
+      </>
+    ))}
+
+    <h2>Make a certificate for every name at once</h2>
+    <p>Teachers and coaches often need 20 or 30 certificates. Choose <strong>Many names</strong> and paste the list, one person per line. You can copy a column of names straight from a spreadsheet. To give one person their own award, add it after a comma, for example <em>Liam Chen, Super Helper Award</em>. If a name has a comma in it, put the name in quotes.</p>
+    <p>Tick <strong>Give each person a different random award</strong> and everyone gets their own title from the list you chose. Not happy with the mix? Press Shuffle awards. Use Previous and Next to check each page, then make one PDF with a page for each person, or print them all in one go.</p>
+
+    <h2>How to keep funny awards kind</h2>
+    <ul>
+      <li>Joke about habits and strengths, such as the coffee runs, the playlists or the tidy desk.</li>
+      <li>Do not joke about looks, weight, age, money, health or grades.</li>
+      <li>Give everyone an award, so nobody feels left out.</li>
+      <li>If you are not sure the person will laugh, pick a warmer title. Every award in this tool is written to make the person smile, not to put them down.</li>
+    </ul>
+
+    <h2>Printing tips</h2>
+    <table class="wide">
+      <thead><tr><th scope="col">Question</th><th scope="col">Answer</th></tr></thead>
+      <tbody>
+        <tr><td>Which paper size?</td><td>US Letter (8.5 x 11 in) in the US and Canada, A4 (210 x 297 mm) in most other countries. Both print in landscape.</td></tr>
+        <tr><td>Which paper?</td><td>Card stock of 65 to 110 lb (about 175 to 300 gsm) feels like a real award. Plain paper is fine for a party.</td></tr>
+        <tr><td>Low on ink?</td><td>Choose the Ink saver design. It uses thin black lines and no color fills.</td></tr>
+        <tr><td>Edges cut off?</td><td>In the print window, set margins to None or Minimum and scale to Fit to page.</td></tr>
+        <tr><td>Want a frame?</td><td>A standard 8.5 x 11 in or A4 frame fits the full page.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Your names stay on your device</h2>
+    <p>The certificate is drawn in your browser, and the PDF and PNG are made on your device. The page does not upload the names or the class list. That matters when you make awards for children. The tool saves only your design, color, paper and signature lines, so the next set takes less time.</p>
+  </article>
+</section>

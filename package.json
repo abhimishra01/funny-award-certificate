@@ -1,0 +1,30 @@
+{
+  "name": "funny-award-certificate",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev --port 4991",
+    "build": "astro build",
+    "test": "node scripts/test-cert.mjs",
+    "test:browser": "node scripts/run-browser-tests.mjs",
+    "test:release": "npm run build && npm run test:browser && npm run build:bingemind",
+    "preview": "astro preview --port 4992",
+    "build:bingemind": "npm test && SITE_MODE=bingemind astro build && node scripts/run-browser-tests.mjs dist-bingemind funny-award-certificate/",
+    "deploy": "npm test && npm run build && npm run test:browser && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/deploy.mjs"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.0",
+    "playwright-core": "^1.64.1",
+    "wrangler": "^4.151.2"
+  },
+  "engines": {
+    "node": ">=22.6"
+  }
+}

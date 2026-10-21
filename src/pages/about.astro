@@ -1,0 +1,19 @@
+---
+import Page from '../layouts/Page.astro';
+import site from '../site.config.ts';
+import { url } from '../lib/url.ts';
+---
+<Page title="About" description="About Funny Award Certificate Maker, a free tool that makes kind, funny award certificates in your browser. See who it is for and how it works.">
+  <p>{site.name} is a free tool that makes funny award certificates. Pick an award, type a name and print it, or save it as a PDF or PNG. You can also paste a list of names and get one PDF with a page for each person.</p>
+  <h2>Who it is for</h2>
+  <p>Office teams, teachers, coaches, parents and friends. Anyone who wants to give a small, kind award at a party, at the end of a season or at the end of the school year.</p>
+  <h2>How to use it</h2>
+  <p>Choose who the awards are for, then pick an idea from the list or press Random award. Type the name. Choose a design, a color and the paper size. Then press Download PDF, PNG or Print. For a whole class or team, switch to Many names and paste the list.</p>
+  <h2>How it works</h2>
+  <p>The certificate is drawn in your browser. The designs, seals, ribbons and trophies are our own drawings. The PDF is made on your device too, so the names you type are not sent to a server. We do not ask you to create an account, and there is no watermark. The tool saves your design and text choices on your own device. It does not save names.</p>
+  <h2>Who made this</h2>
+  <p>This tool was built by <a href="https://bingemind.com/abhishek-mishra/">Abhishek Mishra</a>, a software development engineer (SDE) at Oqu AI, and is published by Bingemind.</p>
+  <p>Phone and WhatsApp: <a href="tel:+916376068337">+91 63760 68337</a> (<a href="https://wa.me/916376068337" rel="noopener">message on WhatsApp</a>).</p>
+  <h2>Contact</h2>
+  <p>Questions or ideas for new awards? Write to <a href={site.contactHref}>{site.contactLabel}</a> or visit the <a href={url('/contact/')}>Contact page</a>.</p>
+</Page>

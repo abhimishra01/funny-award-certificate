@@ -1,0 +1,9 @@
+---
+import Page from '../layouts/Page.astro';
+import site from '../site.config.ts';
+---
+<Page noindex title="Contact" description="Contact the team behind Funny Award Certificate Maker. Report a bug, suggest a new award or design, or ask how the free tool works. We try to reply soon.">
+  <p>We want to hear about bugs, ideas and anything that is unclear.</p>
+  <p>{site.contactWord}: <a href={site.contactHref}>{site.contactLabel}</a></p>
+  <p>We try to reply within a few days. Please include the browser and device you use if you report a problem.</p>
+</Page>

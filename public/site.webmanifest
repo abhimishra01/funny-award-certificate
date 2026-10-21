@@ -1,0 +1,14 @@
+{
+  "name": "Funny Award Certificate Maker",
+  "short_name": "Award Maker",
+  "description": "Make funny award certificates and print them or save a PDF. Free, no sign-up.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f5",
+  "theme_color": "#be123c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
