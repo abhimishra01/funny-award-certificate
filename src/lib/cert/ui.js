@@ -1,18 +1,18 @@
 // Wires the form, the live preview and the exports. Everything runs in the browser; nothing is sent anywhere.
 import { AUDIENCES } from './awards.js';
 import { PAPERS, DPI, pixelSize, formatDate, fileName, pickRandom, parseBatch, resolveBatch, seeded, MAX_BATCH } from './core.js';
-import { drawCertificate, describe } from './draw.js';
+import { drawCertificate, describe, SCRIPT_FAMILY } from './draw.js';
 import { buildPdf } from './pdf.js';
 
 const KEY = 'fac-settings-v1';
-const SAVED = ['design', 'color', 'paper', 'audience', 'heading', 'presented', 'sig1', 'sig2'];
+const SAVED = ['design', 'color', 'paper', 'namestyle', 'audience', 'heading', 'presented', 'sig1', 'sig2'];
 // US Letter where people use it; A4 everywhere else.
 const LETTER_REGIONS = ['US', 'CA', 'MX', 'PH', 'CL', 'CO', 'VE', 'PR', 'GT', 'CR', 'PA', 'DO', 'SV', 'NI', 'HN'];
 const localPaper = () => {
   try { return LETTER_REGIONS.includes(new Intl.Locale(navigator.language).maximize().region) ? 'letter' : 'a4'; } catch { return 'letter'; }
 };
 const DEFAULTS = {
-  design: 'classic', color: 'navy', paper: localPaper(), audience: 'office',
+  design: 'classic', color: 'navy', paper: localPaper(), namestyle: 'serif', audience: 'office',
   heading: 'Certificate of Achievement', presented: 'This award is proudly presented to', sig1: 'Awards Committee', sig2: '',
 };
 
@@ -41,14 +41,14 @@ export function initTool() {
   // ---------- settings ----------
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } };
   const save = () => {
-    const s = { design: radio('design'), color: radio('color'), paper: radio('paper'), audience: f.audience.value,
+    const s = { design: radio('design'), color: radio('color'), paper: radio('paper'), namestyle: radio('namestyle'), audience: f.audience.value,
       heading: f.heading.value, presented: f.presented.value, sig1: f.sig1.value, sig2: f.sig2.value };
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
   };
   const apply = (s) => {
     for (const k of SAVED) {
       if (typeof s[k] !== 'string') continue;
-      if (k === 'design' || k === 'color' || k === 'paper') setRadio(k, s[k]);
+      if (k === 'design' || k === 'color' || k === 'paper' || k === 'namestyle') setRadio(k, s[k]);
       else if (k === 'audience') { if (AUDIENCES.some((a) => a.id === s[k])) f.audience.value = s[k]; }
       else f[k].value = s[k];
     }
@@ -99,6 +99,27 @@ export function initTool() {
   };
   const certs = () => (many() ? (batch.length ? batch : [form()]) : [form()]);
 
+  // ---------- script lettering (loaded from this site only when picked) ----------
+  let scriptReady = null;
+  const loadScript = () => {
+    if (!scriptReady) {
+      const faces = [
+        ['great-vibes-latin.woff2', 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122'],
+        ['great-vibes-latin-ext.woff2', 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF'],
+      ].map(([file, unicodeRange]) => new FontFace(SCRIPT_FAMILY, `url(${import.meta.env.BASE_URL}fonts/${file})`, { unicodeRange }));
+      faces.forEach((ff) => document.fonts.add(ff));
+      // Load the faces the text needs. If it fails (offline before first use), the serif stands in.
+      scriptReady = document.fonts.load(`40px "${SCRIPT_FAMILY}"`, 'AaŁł').catch(() => {}).then(() => schedule());
+    }
+    return scriptReady;
+  };
+  const nameStyle = () => radio('namestyle') || 'serif';
+  const fontsFor = async (list) => {
+    if (nameStyle() !== 'script') return;
+    await loadScript();
+    await Promise.all(list.slice(0, 50).map((c) => document.fonts.load(`40px "${SCRIPT_FAMILY}"`, String(c.name || 'A')).catch(() => {})));
+  };
+
   // ---------- preview ----------
   let queued = false;
   const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(render); } };
@@ -114,7 +135,7 @@ export function initTool() {
     const W = Math.round(cssW * dpr);
     const H = Math.round((cssW * ph / pw) * dpr);
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-    drawCertificate(canvas.getContext('2d'), W, H, c, { design: radio('design'), color: radio('color'), preview: true });
+    drawCertificate(canvas.getContext('2d'), W, H, c, { design: radio('design'), color: radio('color'), nameStyle: nameStyle(), preview: true });
     canvas.setAttribute('aria-label', 'Certificate preview: ' + (describe(c) || 'empty'));
     const pager = $('fc-pager');
     pager.hidden = !(many() && batch.length > 1);
@@ -144,7 +165,7 @@ export function initTool() {
     const paper = radio('paper') || 'letter';
     const { w, h } = pixelSize(paper, DPI);
     work.width = w; work.height = h;
-    drawCertificate(workCtx, w, h, c, { design: radio('design'), color: radio('color') });
+    drawCertificate(workCtx, w, h, c, { design: radio('design'), color: radio('color'), nameStyle: nameStyle() });
     return { w, h };
   };
   const blobOf = (type, q, cv = work) => new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('Could not make the image.'))), type, q));
@@ -233,6 +254,7 @@ export function initTool() {
 
   $('fc-pdf').addEventListener('click', () => guard($('fc-pdf'), async () => {
     const list = certs();
+    await fontsFor(list);
     const paperBox = PAPERS[radio('paper')] || PAPERS.letter;
     let pdf;
     if (list.length > 1) {
@@ -245,6 +267,7 @@ export function initTool() {
 
   $('fc-png').addEventListener('click', () => guard($('fc-png'), async () => {
     const list = certs();
+    await fontsFor(list);
     const c = list[Math.min(page, list.length - 1)];
     renderPage(c);
     download(await blobOf('image/png'), fileName(c.name, 'png'));
@@ -253,6 +276,7 @@ export function initTool() {
 
   $('fc-print').addEventListener('click', () => guard($('fc-print'), async () => {
     const list = certs();
+    await fontsFor(list);
     const pages = await jpegPages(list);
     const paper = radio('paper') === 'a4' ? 'A4' : 'letter';
     let box = document.getElementById('fc-print-pages');
@@ -320,8 +344,13 @@ export function initTool() {
   f.audience.addEventListener('change', () => { fillIdeas(); lastPick = null; refreshBatch(); save(); schedule(); });
   f.idea.addEventListener('change', () => { if (f.idea.value !== '') useAward(pool()[Number(f.idea.value)]); });
   $('fc-random').addEventListener('click', () => useAward(pickRandom(pool(), Math.random, lastPick || pool().find(([t]) => t === f.award.value.trim()))));
-  for (const el of document.querySelectorAll('input[name="design"], input[name="color"], input[name="paper"]')) {
-    el.addEventListener('change', () => { save(); if (el.name !== 'design') renderThumbs(); schedule(); });
+  for (const el of document.querySelectorAll('input[name="design"], input[name="color"], input[name="paper"], input[name="namestyle"]')) {
+    el.addEventListener('change', () => {
+      save();
+      if (el.name === 'namestyle' && el.value === 'script') loadScript();
+      if (el.name === 'color' || el.name === 'paper') renderThumbs();
+      schedule();
+    });
   }
   for (const el of document.querySelectorAll('input[name="mode"]')) {
     el.addEventListener('change', () => {
@@ -369,6 +398,7 @@ export function initTool() {
   const saved = load();
   if (typeof saved.paper !== 'string') setRadio('paper', DEFAULTS.paper);
   apply(saved);
+  if (nameStyle() === 'script') loadScript();
   f.date.value = formatDate(new Date());
   if (f.audience.value !== 'office') { fillIdeas(); useAward(pool()[0]); } else syncIdea();
   renderThumbs();

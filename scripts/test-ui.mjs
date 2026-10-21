@@ -223,6 +223,29 @@ for (const scheme of ['light', 'dark']) {
   await page.context().close();
 }
 
+// ---------- script lettering: loads from this site only when picked, and reaches the PDF
+{
+  const page = await newPage();
+  const fontReqs = [];
+  page.on('request', (r) => { if (/\.woff2/.test(r.url())) fontReqs.push(r.url()); });
+  await page.waitForTimeout(300);
+  eq(fontReqs.length, 0, 'script font not loaded until picked');
+  await page.fill('#fc-name', 'Zoë Łukasz');
+  const before = await pixels(page);
+  await page.click('input[name="namestyle"][value="script"]', { force: true });
+  await page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Great Vibes') && f.status === 'loaded'));
+  await settle(page);
+  ok((await pixels(page)) !== before, 'preview changes to script');
+  ok(fontReqs.length >= 1 && fontReqs.every((u) => u.startsWith(srv.url)), 'script font comes from this site');
+  const pdf = await download(page, '#fc-pdf');
+  eq(pdfInfo(pdf.bytes).pages, 1, 'script pdf');
+  await page.reload();
+  await page.waitForSelector('#tool[data-ready="true"]');
+  eq(await page.$eval('input[name="namestyle"]:checked', (e) => e.value), 'script', 'lettering choice is saved');
+  eq(page.errors, [], 'console errors (script)');
+  await page.context().close();
+}
+
 // ---------- paper follows the visitor's region when nothing is saved
 for (const [locale, paper] of [['en-US', 'letter'], ['en-CA', 'letter'], ['en-GB', 'a4'], ['de-DE', 'a4'], ['en-IN', 'a4']]) {
   const page = await newPage({ locale });

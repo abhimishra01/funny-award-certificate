@@ -20,6 +20,10 @@ export const COLORS = [
 ];
 
 const SERIF = 'Georgia, "Times New Roman", Times, serif';
+// Optional script lettering for the name. Self-hosted (public/fonts, SIL OFL); the page loads it only
+// when someone picks it. Letters the font lacks fall back to the serif.
+export const SCRIPT_FAMILY = 'Great Vibes';
+const SCRIPT = `"${SCRIPT_FAMILY}", ${SERIF}`;
 const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 const INK = '#16181b';
 const GREY = '#4a4d52';
@@ -39,7 +43,8 @@ const LAYOUT = {
 
 /**
  * cert: { heading, presented, name, award, reason, date, sig1, sig2 }
- * opts: { design, color, preview } preview = true draws a light hint where an empty name goes.
+ * opts: { design, color, preview, nameStyle } preview = true draws a light hint where an empty name goes.
+ * nameStyle 'script' writes the name in the script font; anything else uses the serif italic.
  */
 export function drawCertificate(ctx, W, H, cert, opts = {}) {
   const design = LAYOUT[opts.design] ? opts.design : 'classic';
@@ -90,14 +95,17 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   }
 
   // Name on a line.
-  const nameFont = (z) => `italic 700 ${z}px ${SERIF}`;
-  const name = curly(cert.name);
+  const script = opts.nameStyle === 'script';
+  const nameFont = script ? (z) => `400 ${z}px ${SCRIPT}` : (z) => `italic 700 ${z}px ${SERIF}`;
+  // The script face sets words very close together, so it gets a wider (en) space.
+  const name = script ? curly(cert.name).replace(/ +/g, '\u2002') : curly(cert.name);
   const nameY = h * 0.45;
   ctx.strokeStyle = P.accent;
   ctx.lineWidth = 1.5;
   line(ctx, cx - tw * 0.42, nameY + 16, cx + tw * 0.42, nameY + 16);
   if (name) {
-    const size = fitSize(measure(nameFont), name, tw * 0.94, 70, 22);
+    // The script face has a small x-height, so it starts larger to look the same weight on the page.
+    const size = fitSize(measure(nameFont), name, tw * 0.94, script ? 92 : 70, script ? 30 : 22);
     ctx.fillStyle = INK;
     centered(ctx, name, cx, nameY, nameFont(size), tw * 0.94);
   } else if (opts.preview) {

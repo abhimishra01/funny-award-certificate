@@ -287,6 +287,20 @@ t('batch: real awards are not flagged as name columns', () => {
   assert.equal(parseBatch('Ava, Super Helper Award\nLiam, Bookworm Award\nNoor, Kindness Queen').nameColumns, false);
   assert.equal(parseBatch('Ava\nLiam, Brooks').nameColumns, false);
 });
+t('draw: script lettering writes the name in the script font, other text stays serif', () => {
+  const fonts = [];
+  const ctx = new Proxy({ font: '10px serif' }, {
+    get(o, k) {
+      if (k === 'measureText') return (t) => ({ width: String(t).length * 5 });
+      if (k === 'fillText') return (t) => fonts.push([String(t), o.font]);
+      return k in o ? o[k] : () => {};
+    },
+    set(o, k, v) { o[k] = v; return true; },
+  });
+  drawCertificate(ctx, 1100, 850, { name: 'Ava Brooks', award: 'Best Hugger Award' }, { design: 'classic', nameStyle: 'script' });
+  assert.match(fonts.find(([t]) => t === 'Ava\u2002Brooks')[1], /^400 92px "Great Vibes", Georgia/);
+  assert.ok(!/Great Vibes/.test(fonts.find(([t]) => t === 'Best Hugger Award')[1]));
+});
 t('describe', () => assert.equal(describe({ name: 'Ava', award: 'Best Hugger Award', date: 'May 1, 2026', sig2: ' ' }), 'Ava. Best Hugger Award. Date: May 1, 2026'));
 
 console.log(`${passed} tests passed${process.exitCode ? ', some failed' : ''}`);
