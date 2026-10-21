@@ -50,9 +50,23 @@ export function wrapLines(measure, text, maxW, base, min, maxLines) {
         head.push(lines.slice(maxLines - 1).join(' '));
         return { lines: head, size };
       }
-      return { lines, size };
+      return { lines: lines.length === 2 ? balance(measure, words, size, maxW) || lines : lines, size };
     }
   }
+}
+
+// Two lines of about equal width read better than a long line and one orphan word.
+function balance(measure, words, size, maxW) {
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' ');
+    const b = words.slice(i).join(' ');
+    const wa = measure(a, size), wb = measure(b, size);
+    if (wa > maxW || wb > maxW) continue;
+    const worst = Math.max(wa, wb);
+    if (!best || worst < best.worst) best = { worst, lines: [a, b] };
+  }
+  return best && best.lines;
 }
 
 /** "October 21, 2026" style date in the given locale. */

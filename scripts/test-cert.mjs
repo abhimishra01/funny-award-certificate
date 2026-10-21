@@ -9,6 +9,7 @@ let passed = 0;
 const t = (name, fn) => {
   try { fn(); passed++; } catch (e) { console.error(`FAIL ${name}\n  ${e.message}`); process.exitCode = 1; }
 };
+const eq2 = (a, b) => assert.deepEqual(a, b);
 const latin1 = (u8) => Buffer.from(u8).toString('latin1');
 
 // ---------- pages and pixels ----------
@@ -84,6 +85,10 @@ t('wrap: at the minimum, the overflow joins the last line (never cut)', () => {
   assert.equal(r.size, 10);
   assert.equal(r.lines.length, 2);
   assert.equal(r.lines.join(' '), text);
+});
+t('wrap: two lines are balanced, no orphan word', () => {
+  const r = wrapLines(mono, 'For staying calm through every storm and never adding to it.', 400, 20, 10, 2);
+  eq2(r.lines, ['For staying calm through every', 'storm and never adding to it.']);
 });
 t('wrap: empty text', () => assert.deepEqual(wrapLines(mono, '  ', 100, 40, 10, 2), { lines: [], size: 40 }));
 

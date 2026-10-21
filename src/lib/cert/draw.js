@@ -12,11 +12,11 @@ export const DESIGNS = [
 ];
 
 export const COLORS = [
-  { id: 'navy', label: 'Navy and gold', primary: '#1d2b55', accent: '#b88a2c', soft: '#e9eef8' },
-  { id: 'red', label: 'Red', primary: '#9b1c2e', accent: '#b88a2c', soft: '#fbeaec' },
-  { id: 'green', label: 'Green', primary: '#1e5b3f', accent: '#b88a2c', soft: '#e8f3ec' },
-  { id: 'purple', label: 'Purple', primary: '#4a2a72', accent: '#b88a2c', soft: '#efe9f7' },
-  { id: 'black', label: 'Black', primary: '#1b1b1b', accent: '#7a7a7a', soft: '#f0f0f0' },
+  { id: 'navy', label: 'Navy and gold', primary: '#1d2b55', accent: '#b88a2c' },
+  { id: 'red', label: 'Red', primary: '#9b1c2e', accent: '#b88a2c' },
+  { id: 'green', label: 'Green', primary: '#1e5b3f', accent: '#b88a2c' },
+  { id: 'purple', label: 'Purple', primary: '#4a2a72', accent: '#b88a2c' },
+  { id: 'black', label: 'Black', primary: '#1b1b1b', accent: '#7a7a7a' },
 ];
 
 const SERIF = 'Georgia, "Times New Roman", Times, serif';
@@ -43,7 +43,7 @@ export function drawCertificate(ctx, W, H, cert, opts = {}) {
   const design = LAYOUT[opts.design] ? opts.design : 'classic';
   const pal = COLORS.find((c) => c.id === opts.color) || COLORS[0];
   const ink = design === 'ink';
-  const P = ink ? { primary: '#1b1b1b', accent: '#1b1b1b', soft: '#ffffff' } : pal;
+  const P = ink ? { primary: '#1b1b1b', accent: '#1b1b1b' } : pal;
   const s = W / U;
   const h = H / s;
   const L = LAYOUT[design];
@@ -323,11 +323,6 @@ const DECOR = {
     ctx.fillStyle = P.primary; ctx.fillRect(-200, 95, 400, 46);
     ctx.fillStyle = P.accent; ctx.fillRect(-200, 101, 400, 4); ctx.fillRect(-200, 131, 400, 4);
     ctx.restore();
-    ctx.save();
-    ctx.beginPath(); ctx.rect(30, 30, U - 60, h - 60); ctx.clip();
-    ctx.translate(U - 30, h - 30); ctx.rotate(-Math.PI / 4);
-    ctx.fillStyle = P.soft; ctx.fillRect(-260, -150, 520, 70);
-    ctx.restore();
   },
   modern(ctx, h, P) {
     const bw = 0.22 * U;
@@ -376,14 +371,10 @@ const DECOR = {
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       const x = 60 + t * (U - 120);
-      const y = 58 + 34 * 4 * t * (1 - t) * 0.5 + 0;
+      const y = 58 + 68 * t * (1 - t);
       ctx.beginPath(); ctx.moveTo(x - 17, y); ctx.lineTo(x + 17, y); ctx.lineTo(x, y + 30); ctx.closePath();
       ctx.fillStyle = i % 2 ? P.accent : P.primary; ctx.fill();
     }
-    // Stripes at the bottom corners.
-    ctx.fillStyle = P.soft;
-    ctx.fillRect(U - 260, h - 70, 200, 10);
-    ctx.fillRect(U - 220, h - 54, 160, 6);
   },
   ink(ctx, h, P) {
     ctx.strokeStyle = P.primary; ctx.lineWidth = 2;

@@ -49,7 +49,7 @@ const first = AUDIENCES[0].awards[0];
       <label class="fc-field">Award title
         <input id="fc-award" class="ctl" type="text" maxlength="70" value={first[0]} />
       </label>
-      <label class="fc-field">Reason line <span class="fc-opt">(optional)</span>
+      <label class="fc-field"><span>Reason line <span class="fc-opt">(optional)</span></span>
         <textarea id="fc-reason" class="ctl" rows="2" maxlength="140">{first[1]}</textarea>
       </label>
     </fieldset>
@@ -114,11 +114,11 @@ const first = AUDIENCES[0].awards[0];
       <label class="fc-field">Date
         <input id="fc-date" class="ctl" type="text" maxlength="40" />
       </label>
-      <div class="fc-row2 fc-sigs">
+      <div class="fc-sigs">
         <label class="fc-field">Signature line 1
           <input id="fc-sig1" class="ctl" type="text" maxlength="40" value="Awards Committee" />
         </label>
-        <label class="fc-field">Signature line 2 <span class="fc-opt">(optional)</span>
+        <label class="fc-field"><span>Signature line 2 <span class="fc-opt">(optional)</span></span>
           <input id="fc-sig2" class="ctl" type="text" maxlength="40" placeholder="For example: Principal" />
         </label>
       </div>

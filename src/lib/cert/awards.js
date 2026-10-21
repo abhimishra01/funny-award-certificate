@@ -5,7 +5,7 @@
 export const AUDIENCES = [
   {
     id: 'office',
-    label: 'Office and coworkers',
+    label: 'Coworkers',
     awards: [
       ['The Reply All Survivor Award', 'For staying calm through every reply-all storm and never adding to it.'],
       ['Inbox Zero Legend Award', 'For reaching an empty inbox at least once and keeping the secret to themselves.'],
@@ -49,7 +49,7 @@ export const AUDIENCES = [
   },
   {
     id: 'students',
-    label: 'Students (from teachers)',
+    label: 'Students',
     awards: [
       ['Super Speller Award', 'For spelling words that stump the grown-ups.'],
       ['The Kindness Captain Award', 'For always making room for one more friend.'],

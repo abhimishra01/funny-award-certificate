@@ -161,13 +161,14 @@ export function initTool() {
       for (const b of document.querySelectorAll('.fc-actions button')) b.disabled = false;
     }
   };
-  const jpegPages = async (list) => {
+  // JPEG quality 0.85 keeps print-sharp text at about half the file size of 0.92.
+  const jpegPages = async (list, asBytes) => {
     const pages = [];
     for (let i = 0; i < list.length; i++) {
       if (list.length > 1) say(`Making page ${i + 1} of ${list.length}...`);
       const { w, h } = renderPage(list[i]);
-      const blob = await blobOf('image/jpeg', 0.92);
-      pages.push({ w, h, blob, jpeg: new Uint8Array(await blob.arrayBuffer()) });
+      const blob = await blobOf('image/jpeg', 0.85);
+      pages.push(asBytes ? { w, h, jpeg: new Uint8Array(await blob.arrayBuffer()) } : { w, h, blob });
       await nextFrame();
     }
     return pages;
@@ -175,7 +176,7 @@ export function initTool() {
 
   $('fc-pdf').addEventListener('click', () => guard($('fc-pdf'), async () => {
     const list = certs();
-    const pages = await jpegPages(list);
+    const pages = await jpegPages(list, true);
     const pdf = buildPdf(pages, PAPERS[radio('paper')] || PAPERS.letter, 'Award certificate');
     download(new Blob([pdf], { type: 'application/pdf' }), fileName(list[0].name, 'pdf', list.length));
     say(list.length > 1 ? `PDF ready: ${list.length} pages.` : 'PDF ready. Check your downloads.');
