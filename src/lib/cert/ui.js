@@ -165,7 +165,7 @@ export function initTool() {
   const jpegPages = async (list, asBytes) => {
     const pages = [];
     for (let i = 0; i < list.length; i++) {
-      if (list.length > 1) say(`Making page ${i + 1} of ${list.length}...`);
+      if (list.length > 1) say(`Making page ${i + 1} of ${list.length}…`);
       const { w, h } = renderPage(list[i]);
       const blob = await blobOf('image/jpeg', 0.85);
       pages.push(asBytes ? { w, h, jpeg: new Uint8Array(await blob.arrayBuffer()) } : { w, h, blob });

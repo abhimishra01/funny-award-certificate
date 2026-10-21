@@ -52,6 +52,19 @@ for (const scheme of ['light', 'dark']) {
   await page.context().close();
 }
 
+// ---------- theme toggle is saved
+{
+  const page = await newPage({ colorScheme: 'light' });
+  await page.click('#theme-toggle');
+  eq(await page.getAttribute('html', 'data-theme'), 'dark', 'toggle switches to dark');
+  await page.reload();
+  await page.waitForSelector('#tool[data-ready="true"]');
+  eq(await page.getAttribute('html', 'data-theme'), 'dark', 'dark choice kept after reload');
+  await page.click('#theme-toggle');
+  eq(await page.getAttribute('html', 'data-theme'), 'light', 'toggle back to light');
+  await page.context().close();
+}
+
 // ---------- single certificate flow
 {
   const page = await newPage();
@@ -185,6 +198,28 @@ for (const scheme of ['light', 'dark']) {
   await page.context().close();
 }
 
+// ---------- main controls on a phone (390)
+{
+  const page = await newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await page.tap('#fc-random');
+  await page.fill('#fc-name', 'Phone Test');
+  await page.tap('.fc-design:has(input[value="trophy"])');
+  await page.tap('.fc-swatch:has(input[value="green"])');
+  await page.tap('.fc-seg label:has(input[value="a4"])');
+  eq(await page.$eval('input[name="design"]:checked', (e) => e.value), 'trophy', 'phone: design tap');
+  eq(await page.$eval('input[name="color"]:checked', (e) => e.value), 'green', 'phone: color tap');
+  eq(await page.$eval('input[name="paper"]:checked', (e) => e.value), 'a4', 'phone: paper tap');
+  const pdf = await download(page, '#fc-pdf');
+  eq(pdfInfo(pdf.bytes).box, '0 0 841.89 595.28', 'phone: pdf from the bottom bar');
+  await page.tap('.fc-seg label:has(input[value="many"])');
+  await page.fill('#fc-list', 'A\nB');
+  await page.tap('#fc-next');
+  await settle(page);
+  eq(await page.innerText('#fc-page'), '2 of 2', 'phone: pager');
+  eq(page.errors, [], 'console errors (phone)');
+  await page.context().close();
+}
+
 // ---------- "Use this award" buttons in the article
 {
   const page = await newPage();
@@ -195,6 +230,12 @@ for (const scheme of ['light', 'dark']) {
   ok(await page.evaluate(() => document.activeElement?.id === 'fc-name'), 'focus moves to the name');
   const count = await page.locator('[data-use-award]').count();
   ok(count >= 40, `idea buttons: ${count}`);
+  for (let i = 0; i < count; i++) {
+    const b = page.locator('[data-use-award]').nth(i);
+    const want = (await b.getAttribute('aria-label')).replace('Use this award: ', '');
+    await b.click();
+    eq(await page.inputValue('#fc-award'), want, `article button ${i} sets ${want}`);
+  }
   await page.context().close();
 }
 
@@ -214,6 +255,20 @@ for (const scheme of ['light', 'dark']) {
   }
 }
 
+// ---------- other pages at phone widths: no sideways scroll
+for (const scheme of ['light', 'dark']) {
+  for (const w of [390, 320]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, colorScheme: scheme, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    for (const path of ['about/', 'contact/', 'privacy/', 'terms/', '404.html']) {
+      await page.goto(srv.url + entry + path);
+      const d = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+      ok(d.sw <= d.iw, `/${path} at ${w} ${scheme}: scrollWidth ${d.sw} > ${d.iw}`);
+    }
+    await ctx.close();
+  }
+}
+
 // ---------- accessibility (axe): no serious or critical issues
 {
   const axePath = createRequire(import.meta.url).resolve('axe-core/axe.min.js');
@@ -229,6 +284,27 @@ for (const scheme of ['light', 'dark']) {
       await ctx.close();
     }
   }
+}
+
+// ---------- real print output: one sheet per certificate, no blank last page
+for (const [paper, size] of [['letter', [792, 612]], ['a4', [842, 595]]]) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // Keep the print pages in place (no afterprint) so the print layout can be rendered.
+  await ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; });
+  const page = await ctx.newPage();
+  await page.goto(srv.url + entry);
+  await page.waitForSelector('#tool[data-ready="true"]');
+  await page.click(`input[name="paper"][value="${paper}"]`, { force: true });
+  await page.click('input[name="mode"][value="many"]', { force: true });
+  await page.fill('#fc-list', 'Ava\nBen\nCy');
+  await page.click('#fc-print');
+  await page.waitForFunction(() => window.__printed === 1);
+  await page.emulateMedia({ media: 'print' });
+  const pdf = (await page.pdf({ preferCSSPageSize: true, printBackground: true })).toString('latin1');
+  const boxes = [...pdf.matchAll(/\/MediaBox \[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/g)].map((m) => [Math.round(+m[1]), Math.round(+m[2])]);
+  eq(boxes.length, 3, `${paper}: print gives 3 sheets`);
+  for (const b of boxes) eq(b, size, `${paper}: sheet size`);
+  await ctx.close();
 }
 
 // ---------- offline after load (the FAQ promises it)

@@ -141,7 +141,10 @@ select.ctl { padding-right: 6px; }
 .fc-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .fc-swatch { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; cursor: pointer; }
 .fc-dot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--sw) 0 58%, var(--sw2) 58%); box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--edge); }
+.fc-swatch:hover .fc-dot { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--muted); }
 .fc-swatch:has(input:checked) .fc-dot { box-shadow: 0 0 0 2px var(--card), 0 0 0 5px var(--brand-ink); }
+
+.btn, .btn-sm, .link, .fc-seg label, .fc-design, .fc-swatch, .fc-check { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 /* Award idea lists in the article */
 .prose-site ul.fc-ideas { list-style: none; padding-left: 0; margin: 0 0 .5rem; }
@@ -156,6 +159,7 @@ select.ctl { padding-right: 6px; }
 }
 @media (max-width: 1023px) {
   .fc-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; margin: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line-strong); }
+  html { scroll-padding-bottom: 88px; }
   body { padding-bottom: 72px; }
   .fc-status:empty { min-height: 0; margin: 0; }
 }
