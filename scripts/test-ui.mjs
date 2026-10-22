@@ -317,7 +317,9 @@ for (const scheme of ['light', 'dark']) {
     const d = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
     ok(d.sw <= d.iw, `${w} ${scheme}: scrollWidth ${d.sw} > ${d.iw}`);
     const box = await page.locator('.fc-actions').boundingBox();
-    ok(box && box.y + box.height <= 800 + 1 && box.y > 600, `action bar fixed at the bottom (${box?.y})`);
+    // Compare with the real visible height, not a fixed 800: mobile emulation can give a different layout viewport.
+    const vh = await page.evaluate(() => window.innerHeight);
+    ok(box && Math.abs(box.y + box.height - vh) <= 2 && box.y > vh * 0.6, `action bar fixed at the bottom (y ${box?.y}, h ${box?.height}, viewport ${vh}, ${w} ${scheme})`);
     for (const id of ['#fc-pdf', '#fc-png', '#fc-print']) {
       const b = await page.locator(id).boundingBox();
       ok(b.height >= 44 && b.width >= 44, `${id} target ${b.width}x${b.height}`);
