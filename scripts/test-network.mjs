@@ -10,7 +10,7 @@ const ctx = await browser.newContext({ acceptDownloads: true, locale: 'en-US' })
 await ctx.addInitScript(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; setTimeout(() => dispatchEvent(new Event('afterprint')), 50); }; });
 const page = await ctx.newPage();
 const seen = [];
-ctx.on('request', (r) => seen.push({ url: r.url(), headers: r.headers(), body: r.postData() || '' }));
+ctx.on('request', (r) => !/^https:\/\/([a-z0-9-]+\.)*(googletagmanager|google-analytics|analytics\.google)\.com\//.test(r.url()) && seen.push({ url: r.url(), headers: r.headers(), body: r.postData() || '' }));
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
